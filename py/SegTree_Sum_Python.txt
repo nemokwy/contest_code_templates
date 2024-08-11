@@ -1,0 +1,75 @@
+class NumArray:
+    def __init__(self, nums: List[int]):
+        self.n = len(nums)
+        self.data = nums.copy()
+        self.a = [0] * self.n * 4
+        for i in range(self.n):
+            self.update(i,nums[i])
+
+    def _update(self, o,l,r,i,v):
+        if l == r:
+            self.a[o] = v
+            return
+        m = (l + r) // 2
+        if i <= m:
+            self._update(o*2,l,m,i,v)
+        else:
+            self._update(o*2+1,m+1,r,i,v)
+        self.a[o] = max(self.a[o*2], self.a[o*2+1])
+
+    def _query(self, o, l, r, L, R):
+        if L <= l and r <= R:
+            return self.a[o]
+        m = (l + r) // 2
+        res = 0
+        if L <= m:
+            res = max(res, self._query(o*2,l,m,L,R))
+        if R > m:
+            res = max(res, self._query(o*2+1,m+1,r,L,R))
+        return res
+    
+    def _query2(self, o, l, r, L, R, mx):
+        # print(o,l,r,L,R,mx)
+        if self._query(self, o, l, r, L, R) <= mx:
+            return -1
+        if l == r:
+            if self.data[l-1] > mx:
+                # print(l-1,mx)
+                return l - 1
+            return -1
+        m = (l + r) // 2
+        if L <= m:
+            val = self._query2(o*2,l,m,L,R,mx)
+            if val > -1:
+                return val
+        if R > m:
+            val = self._query2(o*2+1,m+1,r,L,R,mx)
+            if val > -1:
+                return val
+        return -1
+
+    def update(self, index: int, val: int) -> None:
+        self._update(1,1,self.n,index+1,val)
+
+    def sumRange(self, left: int, right: int) -> int:
+        return self._query(1,1,self.n, left+1,right+1)
+    
+    def firstIndexLargeThanMx(self, left: int, right: int, mx):
+        return self._query2(1,1,self.n, left+1,right+1, mx)
+
+        
+class Solution:
+    def leftmostBuildingQueries(self, heights: List[int], queries: List[List[int]]) -> List[int]:
+        s = NumArray(heights)
+        ret = []
+        for u,v in queries:
+            if u == v:
+                ret.append(v)
+                continue
+            u,v = min(u,v),max(u,v)
+            if heights[u] < heights[v]:
+                ret.append(v)
+                continue
+            ret.append(s.firstIndexLargeThanMx(v+1,len(heights)-1, max(heights[u],heights[v])))
+        return ret
+                

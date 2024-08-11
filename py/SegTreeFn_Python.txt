@@ -1,0 +1,79 @@
+class SegmentTree:
+    def __init__(self, nums, fn) -> None:
+        self.nums = nums
+        n = len(nums)
+        self.n, self.mn, self.fn = n, [0] * (4 * n), fn
+        for i in range(n): self._update(1, 1, n, i+1, nums[i]) # sgt.query(1,1,n,l,r)表示[l-1,r-1]间的最大值。
+
+    def update(self, i: int, val: int) -> None:
+        _update(1,1,self.n, i+1, val)
+
+    def query(self,  l: int, r: int) -> int:
+        return _query(1,1,self.n, l+1,r+1)
+
+
+    def _update(self, o: int, l: int, r: int, i: int, val: int) -> None:  # 单点更新。更新i, 调用时i需+1
+        if l == r: 
+            self.mn[o] = val 
+            return
+        m = (l + r) // 2
+        if i <= m: self._update(o * 2, l, m, i, val)
+        else: self._update(o * 2 + 1, m + 1, r, i, val)
+        self._push_up(o)
+
+    def _push_up(self, o):
+        if self.fn == sum: self.mn[o] = self.mn[o * 2] + self.mn[o * 2 + 1]
+        else: self.mn[o] = self.fn(self.mn[o * 2], self.mn[o * 2 + 1])
+
+    # 返回区间 [L,R] 内的max/min/sum, 调用的时候o,l,r传入1,1,mx 可参考q1964, sgt.query(1,1,n,l,r)表示[l-1,r-1]间的最大值。
+    def _query(self, o: int, l: int, r: int, L: int, R: int) -> int:  # L 和 R 在整个递归过程中均不变，将其大写，视作常量
+        if L <= l and r <= R: return self.mn[o]
+        res, m = 0, (l + r) // 2
+        if L <= m: res = self._query(o * 2, l, m, L, R)
+            if R > m:
+                if self.fn == sum: res = res + self._query(o * 2 + 1, m + 1, r, L, R)
+                else: res = self.fn(res, self._query(o * 2 + 1, m + 1, r, L, R))
+        elif R > m: 
+            res = self._query(o * 2 + 1, m + 1, r, L, R)
+        return res
+
+class Solution:
+    def maximumSumQueries(self, nums1: List[int], nums2: List[int], queries: List[List[int]]) -> List[int]:
+        n = len(nums1)
+        nn = sorted([(u,v) for u,v in zip(nums1,nums2)])
+        d = []
+        for u,v in nn:
+            if not d or u > d[-1][0]:
+                d.append([u,v])
+            elif u == d[-1][0]:
+                d[-1][1] = v
+            while len(d) >= 2 and d[-1][1] >= d[-2][1]:
+                a,b = d.pop()
+                d.pop()
+                d.append([a,b])
+        # print(d)
+        
+        m = len(d)
+        p,q,t = [0] * m, [0] * m, [0] * m
+        for i in range(m):
+            p[i] = d[i][0]
+            q[i] = d[m-1-i][1]
+            t[i] = d[i][0] + d[i][1]
+        
+        print(p,q[::-1],t)
+        
+        
+        tararr = t
+        sgt = SegmentTree(tararr, max)
+
+        ret = []
+        for x,y in queries:
+            l = bisect_left(p, x)
+            r = bisect_left(q, y)
+            r = m-1-r
+            # print(x,y,l,r)
+            if r < l:
+                ret.append(-1)
+            else:
+                ret.append(sgt.query(1,1,len(t),l+1,r+1)) # sgt.query(1,1,n,l,r)表示[l-1,r-1]间的最大值
+        return ret

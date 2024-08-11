@@ -1,0 +1,72 @@
+https://leetcode.cn/problems/kth-ancestor-of-a-tree-node/solutions/2305895/mo-ban-jiang-jie-shu-shang-bei-zeng-suan-v3rw/
+
+对于单次询问的LCA没啥意思，单次询问怎么都卡不到时间复杂度。只有多次询问的LCA才有意义。
+说一下q次询问的LCA问题，以前做算法训练研究过。
+
+无论是朴素还是倍增还是离线tarjan都需要前序知识就是DFS。
+
+朴素做法，预处理节点深度O(V+E), 对于每次询问让深层次的节点跳到和另外一个层次相同，然后同上一步一步上跳。q次询问总体复杂度是O(qn)
+
+倍增是基于朴素升级的，同样先预处理对于每次询问让深层次的节点跳到和另外一个层次相同，然后一起倍增往高处跳，f[x][i] = f[f[x][0]][i-1];对于跳2^i可以先跳一半到祖先节点然后在从祖先跳一半上去。最后答案就是f[x][0]; q次询问下来时间复杂度就是O(max(q,n) * logn)
+
+线段树或者RMQ解决多次查询，线段树是在线询问问题的克星。先DFS得到一个DFS序列O(V+E)，然后利用RMQ或者线段树预处理DFS序O(nlogn)，对于每次询问直接获取这两个节点之间DFS序的最小值就是LCA。时间复杂度同上
+
+tarjan的离线做法了，这种一次性记录需要查询的序列对，然后依次tarjan直接得到所有的需要查询的答案。时间复杂度是O(V+E)。
+
+对于LCA一般选择倍增是比较好的，又快又准。不需要离线直接在线倍增就行。而线段树在这里是大材小用了。tarjan的强项也不在这里，tarjan是强连通，割边，割点....问题的最优解。
+
+作者：最好的我们
+链接：https://leetcode.cn/problems/lowest-common-ancestor-of-a-binary-tree/solutions/654309/lcawen-ti-by-zui-hao-de-wo-men-6-tmm3/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+class TreeAncestor:
+    def __init__(self, edges: List[List[int]]):
+        n = len(edges) + 1
+        m = n.bit_length()
+        g = [[] for _ in range(n)]
+        for x, y in edges:  # 节点编号从 0 开始
+            g[x].append(y)
+            g[y].append(x)
+
+        depth = [0] * n
+        pa = [[-1] * m for _ in range(n)]
+        def dfs(x: int, fa: int) -> None:
+            pa[x][0] = fa
+            for y in g[x]:
+                if y != fa:
+                    depth[y] = depth[x] + 1
+                    dfs(y, x)
+        dfs(0, -1)
+
+        for i in range(m - 1):
+            for x in range(n):
+                if (p := pa[x][i]) != -1:
+                    pa[x][i + 1] = pa[p][i]
+        self.depth = depth
+        self.pa = pa
+
+    def get_kth_ancestor(self, node: int, k: int) -> int:
+        for i in range(k.bit_length()):
+            if (k >> i) & 1:  # k 二进制从低到高第 i 位是 1
+                node = self.pa[node][i]
+        return node
+
+    # 返回 x 和 y 的最近公共祖先（节点编号从 0 开始）
+    def get_lca(self, x: int, y: int) -> int:
+        if self.depth[x] > self.depth[y]:
+            x, y = y, x
+        # 使 y 和 x 在同一深度
+        y = self.get_kth_ancestor(y, self.depth[y] - self.depth[x])
+        if y == x:
+            return x
+        for i in range(len(self.pa[x]) - 1, -1, -1):
+            px, py = self.pa[x][i], self.pa[y][i]
+            if px != py:
+                x, y = px, py  # 同时上跳 2**i 步
+        return self.pa[x][0]
+
+作者：灵茶山艾府
+链接：https://leetcode.cn/problems/kth-ancestor-of-a-tree-node/solutions/2305895/mo-ban-jiang-jie-shu-shang-bei-zeng-suan-v3rw/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。

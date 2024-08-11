@@ -1,0 +1,37 @@
+class DSU:
+    def __init__(self):
+        self.parents = {}
+        self.weights = {}
+    
+    def find(self, p): 
+        if p not in self.parents:
+            self.parents[p] = p
+            self.weights[p] = 1
+        if self.parents[p] != p:
+            self.parents[p] = self.find(self.parents[p])
+        return self.parents[p]
+    
+    def union(self, p, q):
+        i, j = self.find(p), self.find(q)
+        if i == j: # need to add this when performing path compression, otherwise will be a bug. If not doing weighted, then not needed.
+            return
+        if self.weights[i] >= self.weights[j]:
+            self.parents[j] = i
+            self.weights[i] += self.weights[j] # do not need to reset weights[j] to 0 since we only care about the weights at the root.
+        else:
+            self.parents[i] = j
+            self.weights[j] += self.weights[i]
+        
+    def connected(self, p, q):
+        return self.find(p) == self.find(q)
+    
+    def roots(self):
+        """Returns the disjoint roots of the DSU
+        """
+        res = set()
+        for node in self.parents:
+            res.add(self.find(node))
+        return res
+
+    def getWeight(self, p):
+        return self.weights[self.find(p)]

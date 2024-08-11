@@ -1,0 +1,36 @@
+class NumArray:
+    def __init__(self, nums: List[int]):
+        self.n = len(nums)
+        self.data = nums.copy()
+        self.a = [0] * self.n * 4
+        for i in range(self.n):
+            self.update(i,nums[i])
+
+    def _update(self, o,l,r,i,v):
+        if l == r:
+            self.a[o] = v
+            return
+        m = (l + r) // 2
+        if i <= m:
+            self._update(o*2,l,m,i,v)
+        else:
+            self._update(o*2+1,m+1,r,i,v)
+        # self.a[o] = max(self.a[o*2], self.a[o*2+1])
+        self.a[o] = self.a[o*2] & self.a[o*2+1]
+
+    def _query(self, o, l, r, L, R):
+        if L <= l and r <= R:
+            return self.a[o]
+        m = (l + r) // 2
+        res = (1 << 32) - 1
+        if L <= m:
+            res &= self._query(o*2,l,m,L,R)
+        if R > m:
+            res &= self._query(o*2+1,m+1,r,L,R)
+        return res
+    
+    def update(self, index: int, val: int) -> None:
+        self._update(1,1,self.n,index+1,val)
+
+    def chk(self, left: int, right: int) -> int:
+        return self._query(1,1,self.n, left+1,right+1)

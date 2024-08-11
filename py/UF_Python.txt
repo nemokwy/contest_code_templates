@@ -1,0 +1,26 @@
+class UnionFind:
+    def __init__(self, n):
+        self.UF = {i:i for i in range(n)}
+        self.ds = defaultdict(set)
+
+    def find(self, x):
+        if self.UF[x] != x:
+            self.UF[x] = self.find(self.UF[x])
+        return self.UF[x]
+
+    def union(self, x,y):
+        self.UF[self.find(x)] = self.find(y)
+    
+    def update(self):
+        for k,v in self.UF.items():
+            self.ds[self.find(k)].add(k)
+    
+    def get_set_len(self):
+        return len(self.ds)
+
+    def get_x_set_len(self,x):
+        return len(self.ds[self.find(x)])
+
+    def print(self):
+        print(self.UF)
+        print(self.ds)
