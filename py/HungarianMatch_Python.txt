@@ -1,0 +1,38 @@
+def dfs(u,g,match,visit):
+    for v in g[u]:
+        if not visit[v]:
+            visit[v] = True
+            if match[v] == -1 or dfs(match[v],g,match,visit):
+                match[u] = v
+                match[v] = u
+                return True
+    return False
+def hungarian(g, n, m):
+    match = [-1] * (n+m)
+    count = 0
+    for u in range(n):
+        visit = [False] * (n+m)
+        if dfs(u, g, match, visit):
+            count += 1
+    return count
+
+from collections import defaultdict
+def solution(shoppers, orders, leadTime):   
+    def strToTime(s):
+        return int(s[:2]) * 60 + int(s[3:])
+    def chkInterval(a,b,c,d,e):
+        if min(b,d) - max(a,c) >= e:
+            return 1
+        else:
+            return 0
+    shoppers_time = [[strToTime(a), strToTime(b)] for a,b in shoppers]
+    orders_time = [[strToTime(a), strToTime(b), c] for [a,b], c in zip(orders, leadTime)]
+    n,m = len(shoppers),len(leadTime)
+    g = defaultdict(list)
+    for i in range(n):
+        for j in range(m):
+            if chkInterval(shoppers_time[i][0],shoppers_time[i][1],orders_time[j][0],orders_time[j][1],orders_time[j][2]):
+                g[i].append(n+j)
+    max_match = hungarian(g,n,m)
+    return max_match == m
+    

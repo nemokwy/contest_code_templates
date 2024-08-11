@@ -1,0 +1,319 @@
+#ifndef MINCOSTMAXFLOW_H_
+#define MINCOSTMAXFLOW_H_
+
+#include <cassert>
+#include <algorithm>
+#include <vector>
+#include <queue>
+
+const long long INF = 0x3f3f3f3f3f3f3f3f;
+
+namespace algorithm
+{
+
+	// Current implementation is based on "Capacity Scaling". 
+	// Complexity: O(m^2 log m log U), where U is the max capacity over all edges.
+	// Usually set: FlowType = CostType = int64_t.
+	template<typename FlowType, typename CostType>
+	class MinCostMaxFlow
+	{
+	private:
+		static constexpr FlowType FLOW_INF = INF;
+		static constexpr CostType COST_INF = INF;
+		static constexpr CostType SCALE = 16;
+		struct Edge
+		{
+			int to;
+			FlowType cap;
+			CostType cost;
+			int rev; // the ID of its reversed edge
+			Edge(int to, FlowType cap, CostType cost, int rev) : to(to), cap(cap), cost(cost), rev(rev) { }
+		};
+		int n;
+		std::vector<std::vector<Edge>> edge;
+		CostType negative_loop;
+		bool has_negative_cost;
+
+		std::vector<int> level, ptr;
+		int flow_s, flow_t;
+		int FindLevel()
+		{
+			std::fill(level.begin(), level.end(), 0);
+			std::queue<int> q;
+			q.push(flow_s);
+			level[flow_s] = 1;
+			while (!q.empty())
+			{
+				int x = q.front();
+				q.pop();
+				for (const auto& e : edge[x])
+					if (!level[e.to] && e.cap > 0)
+					{
+						q.push(e.to);
+						level[e.to] = level[x] + 1;
+					}
+			}
+			return level[flow_t];
+		}
+		FlowType FindFlow(int x, FlowType flow)
+		{
+			if (x == flow_t || flow == 0) return flow;
+			for (; ptr[x] < (int)edge[x].size(); ++ptr[x])
+			{
+				Edge& e = edge[x][ptr[x]];
+				if (e.cap > 0 && level[e.to] == level[x] + 1)
+				{
+					FlowType tmp = FindFlow(e.to, std::min(flow, e.cap));
+					if (tmp > 0)
+					{
+						e.cap -= tmp;
+						edge[e.to][e.rev].cap += tmp;
+						return tmp;
+					}
+				}
+			}
+			return 0;
+		}
+		FlowType MaxFlow(int s, int t)
+		{
+			flow_s = s, flow_t = t;
+			level.resize(n);
+			ptr.resize(n);
+			FlowType max_flow = 0;
+			while (FindLevel())
+			{
+				std::fill(ptr.begin(), ptr.end(), 0);
+				for (FlowType flow = 0; (flow = FindFlow(flow_s, FLOW_INF)) != 0; )
+					max_flow += flow;
+			}
+			return max_flow;
+		}
+	public:
+		MinCostMaxFlow(int n) : n(n), edge(n), negative_loop(0), has_negative_cost(false),
+			flow_s(0), flow_t(0) { }
+		void AddEdge(int from, int to, FlowType cap, CostType cost)
+		{
+			assert(0 <= from && from < n && 0 <= to && to < n && cap >= 0);
+			if (cost < 0) has_negative_cost = true;
+			if (from == to)
+			{
+				if (cost < 0) negative_loop += cap * cost;
+				return;
+			}
+			edge[from].push_back(Edge(to, cap, cost, (int)edge[to].size()));
+			edge[to].push_back(Edge(from, 0, -cost, (int)edge[from].size() - 1));
+		}
+		// Complexity: O(m^2 log m log U), where U is the max capacity over all edges.
+		// Reference:
+		// https://ouuan.github.io/post/%E5%9F%BA%E4%BA%8E-capacity-scaling-%E7%9A%84%E5%BC%B1%E5%A4%9A%E9%A1%B9%E5%BC%8F%E5%A4%8D%E6%9D%82%E5%BA%A6%E6%9C%80%E5%B0%8F%E8%B4%B9%E7%94%A8%E6%B5%81%E7%AE%97%E6%B3%95/
+		std::pair<FlowType, CostType> Solve(int s, int t)
+		{
+			assert(s != t);
+			CostType min_cost = 0, eps = 0;
+			const CostType cost_scale = n + 1; // should > n.
+			for (int x = 0; x < n; ++x)
+				for (auto& e : edge[x])
+				{
+					min_cost += e.cap * e.cost;
+					e.cost *= cost_scale;
+					eps = std::max(eps, e.cost);
+				}
+			FlowType max_flow = MaxFlow(s, t);
+			std::vector<CostType> potential(n);
+			std::vector<FlowType> excess(n);
+			std::vector<int> stack;
+			stack.reserve(n);
+			auto potential_cost = [&](int x, const Edge& e) -> CostType
+			{
+				return e.cost + potential[x] - potential[e.to];
+			};
+			auto push = [&](int x, Edge& e, FlowType delta)
+			{
+				delta = std::min(delta, e.cap);
+				e.cap -= delta;
+				edge[e.to][e.rev].cap += delta;
+				excess[x] -= delta;
+				excess[e.to] += delta;
+				if (0 < excess[e.to] && excess[e.to] <= delta)
+					stack.push_back(e.to);
+			};
+			auto relabel = [&](int x, CostType delta)
+			{
+				potential[x] -= delta + eps;
+			};
+			auto relabel_in_advance = [&](int x) -> bool
+			{
+				if (excess[x] != 0) return false;
+				CostType delta = COST_INF;
+				for (auto& e : edge[x])
+				{
+					if (e.cap <= 0) continue;
+					if (CostType cost = potential_cost(x, e); cost < 0)
+						return false;
+					else
+						delta = std::min(delta, cost);
+				}
+				relabel(x, delta);
+				return true;
+			};
+			auto discharge = [&](int x)
+			{
+				CostType delta = COST_INF;
+				for (int i = 0; i < (int)edge[x].size(); ++i)
+				{
+					Edge& e = edge[x][i];
+					if (e.cap <= 0) continue;
+					if (CostType cost = potential_cost(x, e); cost < 0)
+					{
+						if (relabel_in_advance(e.to))
+						{
+							i--;
+							continue;
+						}
+						push(x, e, excess[x]);
+						if (excess[x] == 0) return;
+					}
+					else
+						delta = std::min(delta, cost);
+				}
+				relabel(x, delta);
+				stack.push_back(x);
+			};
+			while (eps > 1)
+			{
+				eps /= SCALE;
+				if (eps < 1) eps = 1;
+				for (int x = 0; x < n; ++x)
+					for (auto& e : edge[x])
+						if (potential_cost(x, e) < 0 && e.cap > 0)
+						{
+							edge[e.to][e.rev].cap += e.cap;
+							excess[x] -= e.cap;
+							excess[e.to] += e.cap;
+							e.cap = 0;
+						}
+				stack.clear();
+				for (int x = 0; x < n; ++x)
+					if (excess[x] > 0)
+						stack.push_back(x);
+				while (!stack.empty())
+				{
+					int x = stack.back();
+					stack.pop_back();
+					discharge(x);
+				}
+			}
+			for (int x = 0; x < n; ++x)
+				for (auto& e : edge[x])
+				{
+					e.cost /= cost_scale;
+					min_cost -= e.cap * e.cost;
+				}
+			min_cost = min_cost / 2 + negative_loop;
+			return { max_flow, min_cost };
+		}
+		// Requirements: the cost of every edge is >= 0.
+		// Complexity: O(max_flow * m log m).
+		// https://github.com/atcoder/ac-library/blob/master/atcoder/mincostflow.hpp
+		std::vector<std::pair<FlowType, CostType>> SolveSmallFlowSlope(int s, int t)
+		{
+			assert(s != t && !has_negative_cost);
+			std::vector<CostType> potential(n);
+			std::vector<CostType> dis(n);
+			std::vector<Edge*> prev(n);
+			std::vector<int> visited(n);
+			std::priority_queue<std::pair<CostType, int>, std::vector<std::pair<CostType, int>>, std::greater<std::pair<CostType, int>>> q;
+			std::vector<int> qmin;
+
+			auto find_path = [&]() -> bool
+			{
+				std::fill(dis.begin(), dis.end(), COST_INF);
+				std::fill(visited.begin(), visited.end(), 0);
+				while (!q.empty()) q.pop();
+				qmin.clear();
+				dis[s] = 0;
+				qmin.push_back(s);
+				while (!qmin.empty() || !q.empty())
+				{
+					int x;
+					if (!qmin.empty())
+					{
+						x = qmin.back();
+						qmin.pop_back();
+					}
+					else
+					{
+						x = q.top().second;
+						q.pop();
+					}
+					if (visited[x]) continue;
+					visited[x] = 1;
+					if (x == t) break;
+					for (Edge& e : edge[x])
+					{
+						if (e.cap == 0) continue;
+						CostType tmp = e.cost + potential[x] - potential[e.to];
+						if (dis[e.to] > dis[x] + tmp)
+						{
+							dis[e.to] = dis[x] + tmp;
+							prev[e.to] = &e;
+							if (dis[e.to] == dis[x])
+								qmin.push_back(e.to);
+							else
+								q.push({ dis[e.to], e.to });
+						}
+					}
+				}
+				if (!visited[t]) return false;
+				for (int x = 0; x < n; ++x)
+					if (visited[x])
+						potential[x] -= dis[t] - dis[x];
+				return true;
+			};
+			
+			std::vector<std::pair<FlowType, CostType>> slope = { { 0, 0 } };
+			FlowType flow = 0;
+			CostType cost = 0;
+			while (find_path())
+			{
+				FlowType cur = FLOW_INF;
+				for (int x = t; x != s; x = edge[prev[x]->to][prev[x]->rev].to)
+					cur = std::min(cur, prev[x]->cap);
+				for (int x = t; x != s; x = edge[prev[x]->to][prev[x]->rev].to)
+				{
+					prev[x]->cap -= cur;
+					edge[prev[x]->to][prev[x]->rev].cap += cur;
+				}
+				flow += cur;
+				cost += cur * (-potential[s]);
+				slope.push_back({ flow, cost });
+			}
+			return slope;
+		}
+		// Requirements: the cost of every edge is >= 0.
+		// Complexity: O(max_flow * m log m).
+		std::pair<FlowType, CostType> SolveSmallFlow(int s, int t)
+		{
+			return SolveSmallFlowSlope(s, t).back();
+		}
+	};
+}
+
+#endif
+
+class Solution {
+public:
+	long long minimumTotalDistance(vector<int>& robot, vector<vector<int>>& factory) {
+		int n = robot.size(), m = factory.size();
+		algorithm::MinCostMaxFlow<long long, long long> g(n + m + 2);
+		int S = n + m, T = n + m + 1;
+		for (int i = 0; i < n; ++i)
+			g.AddEdge(S, i, 1, 0);
+		for (int j = 0; j < m; ++j)
+			g.AddEdge(n + j, T, factory[j][1], 0);
+		for (int i = 0; i < n; ++i)
+			for (int j = 0; j < m; ++j)
+				g.AddEdge(i, n + j, 1, abs(robot[i] - factory[j][0]));
+		return g.Solve(S, T).second;
+	}
+};

@@ -1,0 +1,67 @@
+class Trie:
+    def __init__(self):
+        self.h = {}
+    def insert(self, word: str) -> None:
+        t = self.h
+        for i in word:
+            if i not in t:
+                t[i] = {}
+            t = t[i]
+        if '#' in t:
+            t['#'] += 1
+        else:
+            t['#'] = 1
+    def search(self, word: str) -> bool:
+        t = self.h
+        for i in word:
+            if i not in t:
+                return False
+            t = t[i]
+        if '#' not in t:
+            return False
+        return True
+    def startsWith(self, prefix: str) -> bool:
+        t = self.h
+        for i in prefix:
+            if i not in t:
+                return False
+            t = t[i]
+        return True
+    def searchStart(self, word: str) -> str:
+        t = self.h
+        c = ""
+        for i in word:
+            if "#" in t:
+                return c
+            if i not in t:
+                return ""
+            t = t[i]
+            c += i
+        if "#" in t:
+            return c
+        return ""
+    def searchLongestStart(self, word: str) -> str:
+        t = self.h
+        c = ""
+        for i in word:
+            if i not in t:
+                return c
+            t = t[i]
+            c += i
+        if "#" in t:
+            return c
+        return c
+    def searchAllStart(self, word: str) -> list:
+        t = self.h
+        d = []
+        c = ""
+        for i in word:
+            if '#' in t:
+                d.append((c,t['#']))
+            if i not in t:
+                break
+            t = t[i]
+            c += i
+        if "#" in t and c == word:
+            d.append((c,t['#']))
+        return d

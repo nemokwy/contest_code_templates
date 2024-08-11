@@ -1,0 +1,74 @@
+https://leetcode.cn/problems/palindrome-partitioning-ii/
+https://leetcode.cn/problems/longest-palindromic-substring/submissions/
+
+class Manacher:
+    def __init__(self, string=''):
+        self.add_string = "^@" + "@".join(string) + '@#'
+        self.P, R, mid = [0] * len(self.add_string), 0, 0
+        for i in range(1, len(self.add_string)-1):
+            self.P[i] = min(self.P[mid*2-i], R-i) if R > i else 0
+            while self.add_string[i+1+self.P[i]] == self.add_string[i-1-self.P[i]]: self.P[i] +=1
+            if i + self.P[i] > R: R, mid = i + self.P[i], i
+    def check(self, l, r): # [l,r], r included
+        return self.P[l+r+2] > r - l
+
+class Manacher:
+    def __init__(self, string=''):
+        self.s = string
+        self.get_p()
+
+    def get_p(self): # Manacher算法核心，利用对称性中心扩展O(n)计算P数组
+        """
+        对字符串预处理填充'#'，使得字符串长度强行满足奇数对称。
+        同时头尾插入一对不匹配字符，添加P数组计算的边界情况。
+        """
+        self.add_string = "^@" + "@".join(self.s) + '@#'
+        self.P = [0] * len(self.add_string)
+        R, mid = 0, 0
+        for i in range(1, len(self.add_string)-1):
+            self.P[i] = min(self.P[mid*2-i], R-i) if R > i else 0
+            while self.add_string[i+1+self.P[i]] == self.add_string[i-1-self.P[i]]:
+                self.P[i] +=1
+            if i + self.P[i] > R:
+                R = i + self.P[i]
+                mid = i    
+        return self.P
+    
+    def max_palindrome(self):
+        """
+        利用manacher已计算好的P数组，输出最长的回文子串。可以直接解决 Leetcode 5. 最长回文子串
+        """
+        max_len, max_index = 0, 0
+        for index, value in enumerate(self.P):
+            if value > max_len:
+                max_len, max_index = value, index
+        start_index = (max_index - max_len) // 2
+        return self.s[start_index: start_index+max_len]
+
+    def check_partition_s(self, l, r): # 判断在串S的区间[l,r]的子串是否为回文串。
+        l, r = l * 2 + 2, r * 2 + 2
+        mid = (l + r) // 2
+        return self.P[mid] > r - mid
+        
+    def check_partition_p(self, l, r): # 判断在数组P的区间[l,r]内是否为回文串。
+        mid = (l + r) // 2
+        return self.P[mid] > r - mid
+
+class Solution:
+    def longestPalindrome(self, s: str) -> str:
+        m = Manacher(s)
+        return m.max_palindrome()
+
+class Solution:
+    def minCut(self, s: str) -> int:
+        n = len(s)
+        m = Manacher(s)
+        ret = [n] * (n+1)
+        ret[0] = 0
+        for i in range(n):
+            ret[i+1] = ret[i] + 1
+            for j in range(i):
+                if m.check_partition_s(j,i):
+                    ret[i+1] = min(ret[i+1], ret[j] + 1)
+        # print(ret)
+        return ret[-1] - 1

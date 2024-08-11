@@ -1,0 +1,112 @@
+class MincostFlow:
+
+    class Edge:
+        def __init__(self, u, v, cap, cost, rev=None):
+            self.u = u
+            self.v = v
+            self.cap = cap
+            self.cost = cost
+            self.rev = rev
+
+    def __init__(self, n):
+        self.__n = n
+        self.__edges = []
+
+    def add_edge(self, u, v, cap, cost):
+        e1 = self.Edge(u, v, cap, cost)
+        e2 = self.Edge(v, u, 0, -cost)
+        e1.rev = e2
+        e2.rev = e1
+        self.__edges.append(e1)
+        self.__edges.append(e2)
+
+    def build_graph(self):
+        self.__graph = [[] for i in range(self.__n + 1)]
+        for e in self.__edges:
+            self.__graph[e.u].append(e)
+
+    def slope(self, s, t):
+        res = [[0, 0]]
+        h = self.__build_height(s, t)
+        while True:
+            path = self.__shortest_path(s, t, h)
+            if path is None:
+                break
+            flow = float('inf')
+            cost = 0
+            for e in path:
+                flow = min(flow, e.cap)
+            for e in path:
+                cost += flow * e.cost
+                e.cap -= flow
+                e.rev.cap += flow
+
+            flow += res[-1][0]
+            cost += res[-1][1]
+            res.append([flow, cost])
+        return res
+
+    def max_flow(self, s, t):
+        # [cap: max_flow, cost: min_cost]
+        return (self.slope(s, t))[-1]
+
+    def __build_height(self, s, t):
+        d = [float('inf') for _ in range(self.__n + 1)]
+        d[s] = 0
+        q = deque([s])
+        vis = {s}
+        while len(q) != 0:
+            u = q.popleft()
+            vis.remove(u)
+            for e in self.__graph[u]:
+                if e.cap > 0 and d[u] + e.cost < d[e.v]:
+                    d[e.v] = d[u] + e.cost
+                    if e.v not in vis:
+                        vis.add(e.v)
+                        q.append(e.v)
+        return d
+
+    def __shortest_path(self, s, t, h):
+        d = [float('inf') for _ in range(self.__n + 1)]
+        back = [None for _ in range(self.__n + 1)]
+        d[s] = 0
+        pq = [(d[i], i) for i in range(self.__n + 1)]
+        heapq.heapify(pq)
+        vis = set()
+        while len(pq) != 0:
+            _, u = heapq.heappop(pq)
+            if u in vis:
+                continue
+            if d[u] == float('inf'):
+                break
+            vis.add(u)
+            for e in self.__graph[u]:
+                if e.cap > 0 and d[u] + (e.cost + h[u] - h[e.v]) < d[e.v]:
+                    d[e.v] = d[u] + (e.cost + h[u] - h[e.v])
+                    back[e.v] = e
+                    heapq.heappush(pq, (d[e.v], e.v))
+        if d[t] == float('inf'):
+            return None
+        else:
+            for i in range(self.__n + 1):
+                h[i] += d[i]
+            res = []
+            v = t
+            while back[v] is not None:
+                res.append(back[v])
+                v = back[v].u
+            return res[::-1]
+class Solution:
+    def minimumTotalDistance(self, robot: List[int], factory: List[List[int]]) -> int:
+        n = len(robot)
+        m = len(factory)
+        mcf = MincostFlow(n + m + 10)
+        for i, x in enumerate(robot):
+            for j, (y, _) in enumerate(factory):
+                mcf.add_edge(i + 1, n + j + 1, 1, abs(x - y))
+        for i, x in enumerate(robot):
+            mcf.add_edge(0, i + 1, 1, 0)
+        for j, (y, tt) in enumerate(factory):
+            mcf.add_edge(n + j + 1, m + n + 1, tt, 0)
+        mcf.build_graph()
+        return mcf.max_flow(0, m + n + 1)[-1]

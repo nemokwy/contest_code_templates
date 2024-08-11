@@ -1,0 +1,96 @@
+class NumArray:
+    def __init__(self, nums1):
+        self.n = len(nums1)
+        # self.nums = nums1.copy()
+        self.d = [0] * (4 * self.n)
+        self.ds = [0] * (4 * self.n)
+        self.lazy = [0] * (4 * self.n)
+        self.MOD = 10 ** 9 + 7
+        self.build(1,1,self.n, nums1)
+
+    # 初始化线段树   o,l,r=1,1,n
+    def build(self, o: int, l: int, r: int, a) -> None:
+        if l == r:
+            self.d[l] = a[l-1]
+            return
+        m = (l + r) >> 1
+        self.build(o << 1, l, m, a)
+        self.build(o << 1 | 1, m + 1, r, a)
+        self.pushup(o)
+
+    def prt(self):
+        print(self.d)
+        print(self.ds)
+
+    def pushup(self, o: int) -> None:
+        self.ds[o] = self.ds[o<<1] + self.ds[o<<1|1]
+        self.d[o] = (self.d[o<<1] + self.d[o<<1|1]) % self.MOD
+
+    def pushdown(self, o, l, r):
+        if self.lazy[o]:
+            m = l + r >> 1
+            self._rangeUpdate(o<<1,l,m,self.lazy[o])
+            self._rangeUpdate(o<<1|1,m+1,r,self.lazy[o])
+            self.lazy[o] = 0
+
+
+    # 区间 [L,R] 增加/修改t
+    def _rangeUpdate(self, o: int, l: int, r: int, t) -> None:
+        # for i in range(t):
+        #     self.d[o] += self.ds[o] * 2 + self.dn[o]
+        #     self.ds[o] += self.dn[o]
+        #     if l != r:
+        #         self.pd[o] += 1
+        self.d[o] = (self.d[o] + self.ds[o] * 2 * t + t * t * (r-l+1)) % self.MOD
+        self.ds[o] = self.ds[o] + t * (r-l+1)
+        self.lazy[o] += t 
+
+    # 区间 [L,R]   o,l,r=1,1,n
+    def RangeUpdate(self, o: int, l: int, r: int, L: int, R: int, val) -> None:
+        if L <= l and r <= R: self._rangeUpdate(o, l, r, val)
+        else:
+            self.pushdown(o, l, r)
+            m = l+r>>1
+            if m >= L: self.RangeUpdate(o<<1, l, m, L, R, val)
+            if m < R: self.RangeUpdate(o<<1|1, m + 1, r, L, R, val)
+            self.pushup(o)
+    
+    def _rangeQuery(self, o: int, l: int, r: int, L: int, R: int) -> int:  # L 和 R 在整个递归过程中均不变，将其大写，视作常量
+        if L <= l and r <= R: return self.d[o]
+        res, m = 0, (l + r) >> 1
+        self.pushdown(o, l, r)
+        if L <= m: res += self._rangeQuery(o<<1, l, m, L, R)
+        if R > m: res += res + self._rangeQuery(o<<1|1, m + 1, r, L, R)
+        return res
+    
+    def RangeQuery(self, l: int, r: int) -> int:
+        return self._rangeQuery(1,1,self.n, l+1, r+1)
+
+    def _nodeGet(self, o, l, r, i):
+        # index i
+        if l == r: return self.d[o]
+        m = (l + r) >> 1
+        if m >= i: return self._nodeGet(o<<1,l,m,i)
+        else: return self._nodeGet(o<<1|1,m+1,r,i)
+        
+    def NodeGet(self, i):
+        # index i
+        return self._nodeGet(1,1,self.n,i+1)
+
+        
+
+    
+
+class Solution:
+    def sumCounts(self, nums: List[int]) -> int:
+        MOD = 10 ** 9 + 7
+        
+        n = len(nums)
+        s = NumArray([0] * n)
+        pr = defaultdict(int)
+        ret = 0
+        for i,c in enumerate(nums):            
+            s.RangeUpdate(1,1,n,1+pr[c],1+i, 1)
+            pr[c] = i+1
+            ret = (ret + s.RangeQuery(0,n-1)) % MOD
+        return ret
